@@ -1,0 +1,76 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import librosa
+import scipy.io.wavfile as wav
+
+# ==========================================
+# 1. PARÁMETROS DEL SISTEMA Y DEL ICOA 12
+# ==========================================
+fs = 48000          # Frecuencia de muestreo
+duration = 2.0      # Aumentamos a 2 segundos para escucharlo bien
+f0 = 220.0          # Frecuencia base de prueba (220 Hz - Nota La)
+
+t = np.linspace(0, duration, int(fs * duration), endpoint=False)
+
+# Entrada senoidal pura
+x_in = np.sin(2 * np.pi * f0 * t)
+
+# ==========================================
+# 2. MODELADO NO LINEAL DE LA BOBINA
+# ==========================================
+# A) Entrada limpia (Volumen bajo - Comportamiento lineal)
+y_lineal = x_in * 0.2
+
+# B) Salida del ICOA 12 al límite (Saturación electromecánica tanh)
+# Multiplicamos la entrada para forzar al cono a salir del campo magnético
+y_nolineal = np.tanh(x_in * 4.0) * 0.7  
+
+# ==========================================
+# 3. EXPORTACIÓN A ARCHIVOS AUDIO (.WAV)
+# ==========================================
+# Convertimos las señales flotantes a formato PCM de 16 bits (-32768 a 32767)
+audio_limpio = np.int16(y_lineal * 32767)
+audio_icoa12 = np.int16(y_nolineal * 32767)
+
+wav.write("1_Entrada_Limpia_220Hz.wav", fs, audio_limpio)
+wav.write("2_Salida_ICOA12_Saturado.wav", fs, audio_icoa12)
+
+print("--------------------------------------------------")
+print("¡Archivos .wav generados correctamente en tu carpeta!")
+print("1_Entrada_Limpia_220Hz.wav -> Tono puro de 220 Hz")
+print("2_Salida_ICOA12_Saturado.wav -> Con armónicos en 660Hz, 1100Hz...")
+print("--------------------------------------------------")
+
+# ==========================================
+# 4. GRÁFICAS
+# ==========================================
+plt.figure(figsize=(10, 6))
+
+# Gráfica de forma de onda
+plt.subplot(2, 1, 1)
+plt.plot(t[:500], y_lineal[:500], label="Entrada Limpia (Lineal)", color='blue')
+plt.plot(t[:500], y_nolineal[:500], label="Salida ICOA 12 (Saturada)", color='red', alpha=0.8)
+plt.title("Comparativa de Forma de Onda en el Tiempo")
+plt.xlabel("Tiempo [s]")
+plt.ylabel("Amplitud")
+plt.grid(True)
+plt.legend()
+
+# Gráfica de Espectro FFT
+D_lineal = np.abs(librosa.stft(y_lineal))
+D_nolineal = np.abs(librosa.stft(y_nolineal))
+freqs = librosa.fft_frequencies(sr=fs)
+
+plt.subplot(2, 1, 2)
+plt.semilogx(freqs, librosa.amplitude_to_db(np.mean(D_lineal, axis=1), ref=np.max), label="Entrada Limpia", color='blue')
+plt.semilogx(freqs, librosa.amplitude_to_db(np.mean(D_nolineal, axis=1), ref=np.max), label="ICOA 12 Saturado", color='red')
+plt.xlim(100, 10000)
+plt.ylim(-60, 5)
+plt.title("Generación de Armónicos en el Espectro")
+plt.xlabel("Frecuencia [Hz]")
+plt.ylabel("Magnitud [dB]")
+plt.grid(True, which="both")
+plt.legend()
+
+plt.tight_layout()
+plt.show()
